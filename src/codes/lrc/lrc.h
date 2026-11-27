@@ -38,6 +38,7 @@ typedef struct layout_info
  */
 class LRC
 {
+protected:
     std::unique_ptr<std::byte[]> workspace;
     uint16_t num_threads;
 
@@ -73,22 +74,12 @@ public:
         size_t shard_size,
         std::span<const size_t> unavailable_shards) const = 0;
 
-    // Executes a valid DAG compatible with this code, for one extent. The plan
-    // remains alive and unchanged until return. Arrival order is
-    // arbitrary, so inputs are identified by shard_id rather than queue order.
-    // Input IDs and byte lengths match the plan's RepairInput nodes; output
-    // length matches plan.nodes[plan.result].byte_size.
-    // The caller preallocates output, which must not overlap any input buffer.
-    // Input storage remains alive and unchanged until all consuming work finishes.
-    // Waits when more input is needed; returns failure if delivery is closed and
-    // drained without enough inputs. May return success before delivery closes.
-    // Success means output contains the reconstructed shard; failure does not
-    // guarantee usable output. All decoding workers finish before return.
-    // The implementation chooses worker scheduling and incremental execution.
+    // Executes a valid DAG compatible with this code, for one extent.
+    // May return success before delivery closes.
+    // Success means output contains the reconstructed shard, while output is not meaningful
+    // during failures. All decoding workers finish before return.
     // Uses preallocated workspace, assumed sufficient for all intermediate
-    // calculation buffers. Execution bookkeeping allocations may be timed;
-    // allocation of the intermediate-buffer workspace is outside timing.
-    // Repairs sharing workspace must not execute concurrently.
+    // calculation buffers.
     // The caller owns delivery threads and must join them before destroying the
     // queue or its backing data, including when repair returns early.
     [[nodiscard]] virtual decode_status repair(

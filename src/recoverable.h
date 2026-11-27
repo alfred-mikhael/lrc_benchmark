@@ -6,7 +6,8 @@
 #include <optional>
 #include "src/codes/lrc/lrc.h"
 
-struct storage_conditions;
+class StorageConditions;
+class DeliveryScheduler;
 
 /**
  * Interface layer between data and LRCs.
@@ -29,6 +30,11 @@ private:
     // handled separately so helper-shard retrievals can overlap.
     std::span<const std::byte> read_available_shard(
         size_t extent_number, size_t shard_number) const;
+
+    // Replans until all input shards are available. The target is known to be
+    // unavailable; throws if the code cannot produce a supported repair plan.
+    RepairDAG find_plan(const LRC &code, const StorageConditions &conditions,
+                        size_t extent_number, size_t target, size_t bytes) const;
 
 public:
     Recoverable(const std::filesystem::path &path, size_t extent_size);
@@ -62,9 +68,12 @@ public:
     // Healthy reads borrow extent storage; repaired reads borrow output and are
     // overwritten by the next repair. Storage replacement may invalidate either.
     // Calls sharing output or code workspace must not repair concurrently.
+    // Requires an idle scheduler, used exclusively for this call. Delivery is
+    // finalized before return or exception, so the scheduler can be reused.
     std::span<const std::byte> read_shard(
         size_t extent_number, size_t shard_number,
-        const LRC &code, const storage_conditions &conditions);
+        const LRC &code, const StorageConditions &conditions,
+        DeliveryScheduler &scheduler);
     // Borrows the reusable output buffer; contents are meaningful after a
     // successful repair and may be overwritten by the next repair.
     std::span<const std::byte> read_output() const;
